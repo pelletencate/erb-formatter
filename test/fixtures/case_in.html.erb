@@ -1,0 +1,10 @@
+<% case { hash: { nested: '4' } } %>
+        <% in { hash: { nested: } } %>
+  <span>there</span>
+          <% in { another: } %>
+  <span>there</span>
+  <% in { yet_another: { nested: } %>
+         <span>hi</span>
+        <% else %>
+  <span>there</span>
+    <% end %>
