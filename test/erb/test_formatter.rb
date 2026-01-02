@@ -13,7 +13,7 @@ class ERB::TestFormatter < Minitest::Test
 
   def test_fixtures
     Dir["#{__dir__}/../fixtures/*.html.erb"].shuffle.each do |erb_path|
-      expected_path = erb_path.chomp('.erb') + '.expected.erb'
+      expected_path = erb_path.chomp(".erb") + ".expected.erb"
 
       # File.write expected_path, ERB::Formatter.format(File.read(erb_path))
       assert_equal(File.read(expected_path, encoding: "UTF-8"), ERB::Formatter.new(File.read(erb_path)).to_s, "Formatting of #{erb_path} failed")
@@ -55,8 +55,8 @@ class ERB::TestFormatter < Minitest::Test
     formatter.format_text(text.dup)
 
     assert_equal(
-      text.tr("\n", " ").squeeze(' ').strip,
-      formatter.html.tr("\n", " ").squeeze(' ').strip,
+      text.tr("\n", " ").squeeze(" ").strip,
+      formatter.html.tr("\n", " ").squeeze(" ").strip,
       "Expected to have the same content"
     )
   end
@@ -75,8 +75,8 @@ class ERB::TestFormatter < Minitest::Test
     formatter.format_text(text.dup)
 
     assert_equal(
-      text.tr("\n", " ").squeeze(' ').strip,
-      formatter.html.tr("\n", " ").squeeze(' ').strip,
+      text.tr("\n", " ").squeeze(" ").strip,
+      formatter.html.tr("\n", " ").squeeze(" ").strip,
       "Expected to have the same content"
     )
 
@@ -88,7 +88,7 @@ class ERB::TestFormatter < Minitest::Test
       "\n#{indent}Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu" \
       "\n#{indent}fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in" \
       "\n#{indent}culpa qui officia deserunt mollit anim id est laborum.",
-      formatter.html,
+      formatter.html
     )
   end
 
@@ -107,8 +107,8 @@ class ERB::TestFormatter < Minitest::Test
     formatter.format_text(text.dup)
 
     assert_equal(
-      text.tr("\n", " ").squeeze(' ').strip,
-      formatter.html.tr("\n", " ").squeeze(' ').strip,
+      text.tr("\n", " ").squeeze(" ").strip,
+      formatter.html.tr("\n", " ").squeeze(" ").strip,
       "Expected to have the same content"
     )
 
@@ -117,7 +117,7 @@ class ERB::TestFormatter < Minitest::Test
       "\n      than fourteen (14) days from the date on which we make that" \
       "\n      determination. We will use the same means of payment as You used for the" \
       "\n      Order, and You will not incur any fees for such reimbursement.",
-      formatter.html,
+      formatter.html
     )
   end
 
@@ -131,8 +131,8 @@ class ERB::TestFormatter < Minitest::Test
     formatted = ERB::Formatter.format text
 
     assert_equal(
-      text.tr("\n", " ").squeeze(' ').strip,
-      formatted.tr("\n", " ").squeeze(' ').strip,
+      text.tr("\n", " ").squeeze(" ").strip,
+      formatted.tr("\n", " ").squeeze(" ").strip,
       "Expected to have the same content"
     )
   end
@@ -140,7 +140,7 @@ class ERB::TestFormatter < Minitest::Test
   def test_tagnames_with_dashes
     assert_equal(
       "<custom-div>\n  asdf\n</custom-div>\n",
-      ERB::Formatter.format("<custom-div        > asdf    </custom-div>"),
+      ERB::Formatter.format("<custom-div        > asdf    </custom-div>")
     )
   end
 
@@ -148,43 +148,42 @@ class ERB::TestFormatter < Minitest::Test
     assert_equal(
       <<~ERB,
         <div>
-          <%=
-            render MyComponent.new(
-              foo: barbarbarbarbarbarbarbar,
-              bar: bazbazbazbazbazbazbazbaz,
-            )
+          <%= render MyComponent.new(
+                       foo: barbarbarbarbarbarbarbar,
+                       bar: bazbazbazbazbazbazbazbaz,
+                     )
           %>
         </div>
       ERB
-      ERB::Formatter.format("<div> <%=render MyComponent.new(foo:barbarbarbarbarbarbarbar,bar:bazbazbazbazbazbazbazbaz)%> </div>"),
+      ERB::Formatter.format("<div> <%=render MyComponent.new(foo:barbarbarbarbarbarbarbar,bar:bazbazbazbazbazbazbazbaz)%> </div>")
     )
   end
 
   def test_format_ruby_with_long_lines_and_larger_line_width
     assert_equal(
-      %{<%- vite_client_tag %>\n} +
-      %{<%= vite_typescript_tag "application", "data-turbo-track": "reload", defer: true %>\n} +
-      %{<%= stylesheet_link_tag "tailwind", "inter-font", "data-turbo-track": "reload", defer: true %>\n} +
-      %{<%= stylesheet_link_tag "polaris_view_components", "data-turbo-track": "reload", defer: true %>\n} +
-      %{<%- hotwire_livereload_tags if Rails.env.development? %>\n},
+      %(<%- vite_client_tag %>\n) +
+      %(<%= vite_typescript_tag "application", "data-turbo-track": "reload", defer: true %>\n) +
+      %(<%= stylesheet_link_tag "tailwind", "inter-font", "data-turbo-track": "reload", defer: true %>\n) +
+      %(<%= stylesheet_link_tag "polaris_view_components", "data-turbo-track": "reload", defer: true %>\n) +
+      %(<%- hotwire_livereload_tags if Rails.env.development? %>\n),
       ERB::Formatter.new(
-        %{<%- vite_client_tag %> <%= vite_typescript_tag "application", "data-turbo-track": "reload", defer: true %>\n} +
-        %{<%= stylesheet_link_tag "tailwind",\n} +
-        %{"inter-font", \n} +
-        %{"data-turbo-track": "reload", \n} +
-        %{defer: true %>\n} +
-        %{<%= stylesheet_link_tag "polaris_view_components",\n} +
-        %{"data-turbo-track": "reload",\n} +
-        %{defer: true %>\n} +
-        %{<%- hotwire_livereload_tags if Rails.env .development? %>\n},
-        line_width: 120,
-      ).to_s,
+        %(<%- vite_client_tag %> <%= vite_typescript_tag "application", "data-turbo-track": "reload", defer: true %>\n) +
+        %(<%= stylesheet_link_tag "tailwind",\n) +
+        %("inter-font", \n) +
+        %("data-turbo-track": "reload", \n) +
+        %(defer: true %>\n) +
+        %(<%= stylesheet_link_tag "polaris_view_components",\n) +
+        %("data-turbo-track": "reload",\n) +
+        %(defer: true %>\n) +
+        %(<%- hotwire_livereload_tags if Rails.env .development? %>\n),
+        line_width: 120
+      ).to_s
     )
   end
 
   def test_tailwindcss_class_sorting
-    require 'tailwindcss-rails'
-    require 'erb/formatter/command_line'
+    require "tailwindcss-rails"
+    require "erb/formatter/command_line"
 
     error_log = "#{__dir__}/../../tmp/tailwindcss.err.log"
     Dir.mkdir(File.dirname(error_log)) unless File.exist?(File.dirname(error_log))
@@ -193,7 +192,7 @@ class ERB::TestFormatter < Minitest::Test
       Tailwindcss::Commands.executable,
       "--content", "#{__dir__}/../fixtures/tailwindcss/class_sorting.html.erb",
       "--output", "#{__dir__}/../fixtures/tailwindcss/class_sorting.css",
-      err: error_log,
+      err: error_log
     ) || raise("Failed to generate tailwindcss output:\n#{File.read(error_log)}")
 
     css_class_sorter = ERB::Formatter::CommandLine.tailwindcss_class_sorter("#{__dir__}/../fixtures/tailwindcss/class_sorting.css")
@@ -202,8 +201,8 @@ class ERB::TestFormatter < Minitest::Test
       File.read("#{__dir__}/../fixtures/tailwindcss/class_sorting.html.expected.erb"),
       ERB::Formatter.new(
         File.read("#{__dir__}/../fixtures/tailwindcss/class_sorting.html.erb"),
-        css_class_sorter: css_class_sorter,
-      ).to_s,
+        css_class_sorter: css_class_sorter
+      ).to_s
     )
   end
 end

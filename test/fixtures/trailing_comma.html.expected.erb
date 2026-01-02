@@ -1,11 +1,12 @@
-<%=
-  render component("ui/table").new(
-    id: "option-types-list",
-    data: {
-      rows: @option_types,
-      url: ->(option_type) { edit_admin_option_type_path(option_type) },
-      columns: columns,
-      batch_actions: batch_actions,
-    },
-  )
+<%= render component("ui/table").new(
+             id: "option-types-list",
+             data: {
+               rows: @option_types,
+               url: ->(option_type) do
+                 edit_admin_option_type_path(option_type)
+               end,
+               columns: columns,
+               batch_actions: batch_actions,
+             },
+           )
 %>

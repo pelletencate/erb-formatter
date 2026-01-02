@@ -1,15 +1,15 @@
 # frozen_string_literal: false
 
-require 'pp'
-require 'erb'
-require 'yaml'
-require 'strscan'
-require 'stringio'
-require 'securerandom'
-require 'erb/formatter/version'
+require "pp"
+require "erb"
+require "yaml"
+require "strscan"
+require "stringio"
+require "securerandom"
+require "erb/formatter/version"
 
-require 'syntax_tree'
-require 'syntax_tree/plugin/trailing_comma'
+require "syntax_tree"
+require "syntax_tree/plugin/trailing_comma"
 
 class ERB::Formatter
   module SyntaxTreeCommandPatch
@@ -22,7 +22,7 @@ class ERB::Formatter
     end
   end
 
-  autoload :IgnoreList, 'erb/formatter/ignore_list'
+  autoload :IgnoreList, "erb/formatter/ignore_list"
 
   class Error < StandardError; end
 
@@ -51,10 +51,10 @@ class ERB::Formatter
   SELF_CLOSING_TAG = /\A(area|base|br|col|command|embed|hr|img|input|keygen|link|menuitem|meta|param|source|track|wbr)\z/i
 
   begin
-    require 'prism' # ruby 3.3
+    require "prism" # ruby 3.3
     RUBY_OPEN_BLOCK = Prism.method(:parse_failure?)
   rescue LoadError
-    require 'ripper'
+    require "ripper"
     RUBY_OPEN_BLOCK = ->(code) do
       # is nil when the parsing is broken, meaning it's an open expression
       Ripper.sexp(code).nil?
@@ -78,15 +78,16 @@ class ERB::Formatter
     new(source, filename: filename).html
   end
 
-  def initialize(source, line_width: 80, single_class_per_line: false, filename: nil, css_class_sorter: nil, debug: $DEBUG)
+  def initialize(source, line_width: 80, single_class_per_line: false, filename: nil, css_class_sorter: nil,
+    debug: $DEBUG)
     @original_source = source.to_s
     @original_source = +@original_source if @original_source.frozen?
-    @original_source.force_encoding('UTF-8')
+    @original_source.force_encoding("UTF-8")
 
-    @filename = filename || '(erb)'
+    @filename = filename || "(erb)"
     @line_width = line_width
     @source = remove_front_matter @original_source.dup
-    @html = +"".force_encoding('UTF-8')
+    @html = +"".force_encoding("UTF-8")
     @debug = debug
     @single_class_per_line = single_class_per_line
     @css_class_sorter = css_class_sorter
@@ -96,7 +97,7 @@ class ERB::Formatter
     @tag_stack = []
     @pre_pos = 0
 
-    build_uid = -> { ['erb', SecureRandom.uuid, 'tag'].join.delete('-') }
+    build_uid = -> { ["erb", SecureRandom.uuid, "tag"].join.delete("-") }
 
     @pre_placeholders = {}
     @erb_tags = {}
@@ -126,7 +127,7 @@ class ERB::Formatter
     :source, :html, :tag_stack, :pre_pos, :pre_placeholders, :erb_tags, :erb_tags_regexp,
     :pre_placeholders_regexp, :tags_regexp, :line_width
 
-  alias to_s html
+  alias_method :to_s, :html
 
   def format_attributes(tag_name, attrs, tag_closing)
     return "" if attrs.strip.empty?
@@ -137,73 +138,96 @@ class ERB::Formatter
     return " #{plain_attrs}" if within_line_width && !@css_class_sorter && !plain_attrs.match?(/ class=/)
 
     attr_html = ""
-    tag_stack_push(['attr='], attrs)
-
+    tag_stack_push(["attr="], attrs)
+    # Calculate alignment for subsequent attributes (align with first attr position)
+    # Account for: "<" + tag_name + " "
+    # Use tag_stack.size - 1 because we just pushed 'attr=' onto the stack
+    base_indent = "  " * (tag_stack.size - 1)
+    attr_indent = " " * (tag_name.length + 2)
+    first_attr = true
     attrs.scan(ATTR).flatten.each do |attr|
       attr.strip!
-      name, value = attr.split('=', 2)
-
+      name, value = attr.split("=", 2)
+      # Build the full attribute string
       if value.nil?
-        attr_html << indented("#{name}")
-        next
-      end
+        full_attr = name
+      elsif /\A#{UNQUOTED_VALUE}\z/o.match?(value)
+        full_attr = "#{name}=\"#{value}\""
+      else
+        value_parts = value[1...-1].strip.split(SPACES)
+        value_parts.sort_by!(&@css_class_sorter) if name == "class" && @css_class_sorter
+        quote_char = value[0]
 
-      if /\A#{UNQUOTED_VALUE}\z/o.match?(value)
-        attr_html << indented("#{name}=\"#{value}\"")
-        next
-      end
+        # Check if this attribute can have its value split across lines
+        if MULTILINE_ATTR_NAMES.include?(name)
 
-      value_parts = value[1...-1].strip.split(SPACES)
-      value_parts.sort_by!(&@css_class_sorter) if name == 'class' && @css_class_sorter
+          test_attr = "#{name}=#{quote_char}#{value_parts.join(" ")}#{value[-1]}"
+          # For first attr, position is base_indent + "<" + tag_name + " "
+          # For subsequent attrs, position is base_indent + attr_indent
+          attr_position = base_indent.length + (first_attr ? (tag_name.length + 2) : attr_indent.length)
 
-      full_attr = "#{name}=#{value[0]}#{value_parts.join(" ")}#{value[-1]}"
-      full_attr = within_line_width ? " #{full_attr}" : indented(full_attr)
+          if (attr_position + test_attr.length) > line_width && value_parts.length > 1
+            equals_and_quote_length = 2
+            value_indent = " " * (attr_position + name.length + equals_and_quote_length)
 
-      if full_attr.size > line_width && MULTILINE_ATTR_NAMES.include?(name) && attr.match?(QUOTED_ATTR)
-        attr_html << indented("#{name}=#{value[0]}")
-        tag_stack_push('attr"', value)
+            lines = []
+            current_line = []
+            current_length = attr_position + name.length + equals_and_quote_length
 
-        if !@single_class_per_line && name == 'class'
-          line = value_parts.shift
-          value_parts.each do |value_part|
-            if (line.size + value_part.size + 1) <= line_width
-              line << " #{value_part}"
-            else
-              attr_html << indented(line)
-              line = value_part
+            value_parts.each do |part|
+              space_length = current_line.empty? ? 0 : 1
+              test_length = current_length + space_length + part.length
+
+              if test_length <= line_width || current_line.empty?
+                current_line << part
+                current_length = test_length
+              else
+                lines << current_line.join(" ")
+                current_line = [part]
+                current_length = value_indent.length + part.length
+              end
             end
+            lines << current_line.join(" ") unless current_line.empty?
+            full_attr = "#{name}=#{quote_char}#{lines.join("\n#{value_indent}")}#{value[-1]}"
+          else
+            full_attr = "#{name}=#{quote_char}#{value_parts.join(" ")}#{value[-1]}"
           end
-          attr_html << indented(line) if line
         else
-          value_parts.each do |value_part|
-            attr_html << indented(value_part)
-          end
+          full_attr = "#{name}=#{value[0]}#{value_parts.join(" ")}#{value[-1]}"
         end
 
-        tag_stack_pop('attr"', value)
-        attr_html << (within_line_width ? value[-1] : indented(value[-1]))
+      end
+      # First attribute goes on same line as tag, rest are aligned
+      if first_attr
+        attr_html << " #{full_attr}"
+        first_attr = false
       else
-        attr_html << full_attr
+        # Align with first attribute position
+        attr_html << "\n#{base_indent}#{attr_indent}#{full_attr}"
       end
     end
-
-    tag_stack_pop(['attr='], attrs)
-    attr_html << indented("") unless within_line_width
+    tag_stack_pop(["attr="], attrs)
+    # Closing tag stays on same line as last attribute
     attr_html
   end
 
-  def tag_stack_push(tag_name, code)
-    tag_stack << [tag_name, code]
+  def tag_stack_push(tag_name, code, multiline: false)
+    tag_stack << [tag_name, code, multiline]
     p PUSH: tag_stack if @debug
   end
 
   def tag_stack_pop(tag_name, code)
-    if tag_name == tag_stack.last&.first
-      tag_stack.pop
-      p POP_: tag_stack if @debug
-    else
+    unless tag_name == tag_stack.last&.first
       raise "Unmatched close tag, tried with #{[tag_name, code]}, but #{tag_stack.last} was on the stack"
     end
+
+    entry = tag_stack.pop
+    p POP_: tag_stack if @debug
+    entry
+  end
+
+  def current_tag_multiline?
+    tag_stack.last&.[](2) || false
   end
 
   def raise(message)
@@ -215,10 +239,10 @@ class ERB::Formatter
       html,
       "==> STACK:",
       tag_stack.pretty_inspect,
-      "==> ERROR: #{message}",
+      "==> ERROR: #{message}"
     ].join("\n"))
     error.set_backtrace caller.to_a + [location]
-    super error
+    super(error)
   end
 
   def indented(string, strip: true)
@@ -231,14 +255,14 @@ class ERB::Formatter
     p format_text: text if @debug
     return unless text
 
-    starting_space = text.match?(/\A\s/)
+    starting_space = text.match?(/\A\s/) || current_tag_multiline?
 
     final_newlines_count = text.match(/(\s*)\z/m).captures.last.count("\n")
     html << "\n" if final_newlines_count > 1
 
     return if text.match?(/\A\s*\z/m) # empty
 
-    text = text.gsub(SPACES, ' ').strip
+    text = text.gsub(SPACES, " ").strip
 
     offset = indented("").size
     # Restore full line width if there are less than 40 columns available
@@ -249,12 +273,12 @@ class ERB::Formatter
 
     until text.empty?
       if text.size >= available_width
-        last_space_index = text[0..available_width].rindex(' ')
+        last_space_index = text[0..available_width].rindex(" ")
         lines << text.slice!(0..last_space_index)
       else
         lines << text.slice!(0..-1)
       end
-      offset = 0
+      0
     end
     p lines: lines if @debug
     html << lines.shift.strip unless starting_space
@@ -263,7 +287,7 @@ class ERB::Formatter
     end
   end
 
-  def format_ruby(code, autoclose: false)
+  def format_ruby(code, autoclose: false, open_length: 3)
     if autoclose
       code += "\nend" unless RUBY_OPEN_BLOCK["#{code}\nend"]
       code += "\n}" unless RUBY_OPEN_BLOCK["#{code}\n}"]
@@ -285,7 +309,7 @@ class ERB::Formatter
 
     lines = code.strip.lines
     lines = lines[0...-1] if autoclose
-    code = lines.map { |l| indented("  #{l.chomp("\n")}", strip: false) }.join
+    code = lines.map { |l| indented("#{" " * (open_length - 1)}#{l.chomp("\n")}", strip: false) }.join
     p RUBY_OUT: code if @debug
     code
   end
@@ -301,7 +325,7 @@ class ERB::Formatter
     erb_pre_pos = 0
     until erb_scanner.eos?
       if erb_scanner.scan_until(erb_tags_regexp)
-        p PRE_MATCH: [erb_pre_pos, '..', erb_scanner.pre_match] if @debug
+        p PRE_MATCH: [erb_pre_pos, "..", erb_scanner.pre_match] if @debug
         erb_pre_match = erb_scanner.pre_match
         erb_pre_match = erb_pre_match[erb_pre_pos..].to_s
         erb_pre_pos = erb_scanner.pos
@@ -314,7 +338,7 @@ class ERB::Formatter
         ruby_code.strip!
 
         block_type =
-          if erb_open.include?('#')
+          if erb_open.include?("#")
             :comment
           else
             case ruby_code
@@ -334,32 +358,34 @@ class ERB::Formatter
             # If this is a block starter (ends with "do" or "{" followed by optional block parameters), it usually is a
             #   valid statement without the suffix
             suffix = match[0]
-            ruby_code = "#{format_ruby(ruby_code.chomp(suffix), autoclose: false)} #{suffix.strip}"
-          elsif ruby_code.start_with?('if ', 'unless ', 'while ', 'until ')
+            ruby_code = "#{format_ruby(ruby_code.chomp(suffix), autoclose: false,
+              open_length: erb_open.length)} #{suffix.strip}"
+          elsif ruby_code.start_with?("if ", "unless ", "while ", "until ")
             # If this is a condition or loop, it may be a valid expression without first word
             keyword, rest = ruby_code.split(/\s+/, 2)
-            ruby_code = format_ruby(rest, autoclose: false).sub(/^(\s*)/, "\\1#{keyword} " )
+            ruby_code = format_ruby(rest, autoclose: false, open_length: erb_open.length).sub(/^(\s*)/,
+              "\\1#{keyword} ")
           end
-          ruby_code.gsub!(/^/, '  ') if ruby_code.strip.include?("\n")
-        elsif block_type == :standalone || block_type == :other
-          ruby_code = format_ruby(ruby_code, autoclose: false)
-          ruby_code.gsub!(/^/, '  ') if ruby_code.strip.include?("\n")
+          ruby_code.gsub!(/^/, "  ") if ruby_code.strip.include?("\n")
+        elsif %i[standalone other].include?(block_type)
+          ruby_code = format_ruby(ruby_code, autoclose: false, open_length: erb_open.length)
+          ruby_code.gsub!(/^/, "  ") if ruby_code.strip.include?("\n")
         end
 
         # Remove the first line if it only has whitespace
-        ruby_code.sub!(/\A((?!\n)\s)*\n/, '')
+        ruby_code.sub!(/\A((?!\n)\s)*\n/, "")
 
         # Reset "common" indentation of multi-line comments
         if block_type == :comment && ruby_code.strip.include?("\n")
           # Leave comments intact, but if they're multiline, replace common indentation
-          ruby_code.gsub!(/^#{ruby_code.scan(/^ */).min_by(&:length)}/, '  ')
+          ruby_code.gsub!(/^#{ruby_code.scan(/^ */).min_by(&:length)}/, "  ")
         end
 
-        full_erb_tag = "#{erb_open} #{ruby_code.strip} #{erb_close}"
+        full_erb_tag = "#{erb_open} #{ruby_code.strip}#{ruby_code.strip.include?("\n") ? indented(erb_close) : " #{erb_close}"}"
 
-        tag_stack_pop('%erb%', ruby_code) if %i[close reopen].include? block_type
+        tag_stack_pop("%erb%", ruby_code) if %i[close reopen].include? block_type
         html << (erb_pre_match.match?(/\s+\z/) ? indented(full_erb_tag) : full_erb_tag)
-        tag_stack_push('%erb%', ruby_code) if %i[reopen open].include? block_type
+        tag_stack_push("%erb%", ruby_code) if %i[reopen open].include? block_type
       else
         p ERB_REST: erb_scanner.rest if @debug
         rest = erb_scanner.rest.to_s
@@ -374,7 +400,7 @@ class ERB::Formatter
 
     until scanner.eos?
       if matched = scanner.scan_until(tags_regexp)
-        p format_pre_match: [pre_pos, '..', scanner.pre_match[pre_pos..]] if @debug
+        p format_pre_match: [pre_pos, "..", scanner.pre_match[pre_pos..]] if @debug
         pre_match = scanner.pre_match[pre_pos..]
         p POS: pre_pos...scanner.pos, advanced: source[pre_pos...scanner.pos] if @debug
         p MATCHED: matched if @debug
@@ -389,21 +415,24 @@ class ERB::Formatter
           tag_name = scanner.captures.first
 
           full_tag = "</#{tag_name}>"
-          tag_stack_pop(tag_name, full_tag)
-          html << (scanner.pre_match.match?(/\s+\z/) ? indented(full_tag) : full_tag)
+          popped_entry = tag_stack_pop(tag_name, full_tag)
+          multiline = popped_entry&.[](2) || false
+          should_indent = scanner.pre_match.match?(/\s+\z/) || multiline
+          html << (should_indent ? indented(full_tag) : full_tag)
 
         elsif matched.match(HTML_TAG_OPEN)
           _, tag_name, tag_attrs, _, tag_closing = *scanner.captures
 
           raise "Unknown tag #{tag_name.inspect}" unless tag_name.match?(TAG_NAME_ONLY)
 
-          tag_self_closing = tag_closing == '/>' || SELF_CLOSING_TAG.match?(tag_name)
+          tag_self_closing = tag_closing == "/>" || SELF_CLOSING_TAG.match?(tag_name)
           tag_attrs.strip!
           formatted_tag_name = format_attributes(tag_name, tag_attrs.strip, tag_closing).gsub(erb_tags_regexp, erb_tags)
           full_tag = "<#{tag_name}#{formatted_tag_name}#{tag_closing}"
+          tag_multiline = formatted_tag_name.include?("\n")
           html << (scanner.pre_match.match?(/\s+\z/) ? indented(full_tag) : full_tag)
 
-          tag_stack_push(tag_name, full_tag) unless tag_self_closing
+          tag_stack_push(tag_name, full_tag, multiline: tag_multiline) unless tag_self_closing
         else
           raise "Unrecognized content: #{matched.inspect}"
         end
