@@ -9,7 +9,6 @@ require "securerandom"
 require "erb/formatter/version"
 
 require "syntax_tree"
-require "syntax_tree/plugin/trailing_comma"
 
 class ERB::Formatter
   module SyntaxTreeCommandPatch
