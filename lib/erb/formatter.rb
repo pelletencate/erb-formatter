@@ -427,7 +427,8 @@ class ERB::Formatter
           tag_self_closing = tag_closing == "/>" || SELF_CLOSING_TAG.match?(tag_name)
           tag_attrs.strip!
           formatted_tag_name = format_attributes(tag_name, tag_attrs.strip, tag_closing).gsub(erb_tags_regexp, erb_tags)
-          full_tag = "<#{tag_name}#{formatted_tag_name}#{tag_closing}"
+          closing = (tag_closing == "/>") ? " />" : tag_closing
+          full_tag = "<#{tag_name}#{formatted_tag_name}#{closing}"
           tag_multiline = formatted_tag_name.include?("\n")
           html << (scanner.pre_match.match?(/\s+\z/) ? indented(full_tag) : full_tag)
 
