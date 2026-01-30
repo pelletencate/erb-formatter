@@ -11,6 +11,21 @@ class ERB::TestFormatter < Minitest::Test
     assert_equal("<div>\n  asdf\n</div>\n", ERB::Formatter.format("<div        > asdf    </div>"))
   end
 
+  def test_class_attribute_stays_single_line_when_fits
+    assert_equal(
+      "<span id=\"asdf\" class=\"klass\"></span>\n",
+      ERB::Formatter.format('<span id="asdf" class="klass"></span>')
+    )
+  end
+
+  def test_class_attribute_with_sorter_stays_single_line_when_fits
+    sorter = ->(css_class) { css_class }
+    assert_equal(
+      "<span id=\"asdf\" class=\"klass\"></span>\n",
+      ERB::Formatter.new('<span id="asdf" class="klass"></span>', css_class_sorter: sorter).to_s
+    )
+  end
+
   def test_fixtures
     Dir["#{__dir__}/../fixtures/*.html.erb"].shuffle.each do |erb_path|
       expected_path = erb_path.chomp(".erb") + ".expected.erb"
@@ -150,7 +165,7 @@ class ERB::TestFormatter < Minitest::Test
         <div>
           <%= render MyComponent.new(
                        foo: barbarbarbarbarbarbarbar,
-                       bar: bazbazbazbazbazbazbazbaz,
+                       bar: bazbazbazbazbazbazbazbaz
                      )
           %>
         </div>

@@ -132,9 +132,15 @@ class ERB::Formatter
     return "" if attrs.strip.empty?
 
     plain_attrs = attrs.tr("\n", " ").squeeze(" ").gsub(erb_tags_regexp, erb_tags)
-    within_line_width = "<#{tag_name} #{plain_attrs}#{tag_closing}".size <= line_width
 
-    return " #{plain_attrs}" if within_line_width && !@css_class_sorter && !plain_attrs.match?(/ class=/)
+    if @css_class_sorter
+      sorted_attrs = build_single_line_attrs(attrs)
+      within_line_width = "<#{tag_name} #{sorted_attrs}#{tag_closing}".size <= line_width
+      return " #{sorted_attrs}" if within_line_width
+    else
+      within_line_width = "<#{tag_name} #{plain_attrs}#{tag_closing}".size <= line_width
+      return " #{plain_attrs}" if within_line_width
+    end
 
     attr_html = ""
     tag_stack_push(["attr="], attrs)
@@ -208,6 +214,22 @@ class ERB::Formatter
     tag_stack_pop(["attr="], attrs)
     # Closing tag stays on same line as last attribute
     attr_html
+  end
+
+  def build_single_line_attrs(attrs)
+    attrs.scan(ATTR).flatten.map do |attr|
+      attr = attr.strip
+      name, value = attr.split("=", 2)
+      if value.nil?
+        name
+      elsif /\A#{UNQUOTED_VALUE}\z/o.match?(value)
+        "#{name}=\"#{value}\""
+      else
+        value_parts = value[1...-1].strip.split(SPACES)
+        value_parts.sort_by!(&@css_class_sorter) if name == "class" && @css_class_sorter
+        "#{name}=#{value[0]}#{value_parts.join(" ")}#{value[-1]}"
+      end
+    end.join(" ")
   end
 
   def tag_stack_push(tag_name, code, multiline: false)
