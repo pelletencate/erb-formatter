@@ -26,6 +26,17 @@ class ERB::TestFormatter < Minitest::Test
     )
   end
 
+  def test_attributes_break_multiline_when_indentation_plus_tag_exceeds_line_width
+    input = <<~ERB
+      <div><div><div><div><div><div><div><div>
+        <turbo-frame id="rich_select_suggestions" class="relative z-10 block w-full" data-input-search-target="results"></turbo-frame>
+      </div></div></div></div></div></div></div></div>
+    ERB
+    result = ERB::Formatter.new(input, line_width: 120).to_s
+    assert_match(/turbo-frame id="rich_select_suggestions"\n/, result)
+    assert_match(/class="relative z-10 block w-full"\n/, result)
+  end
+
   def test_fixtures
     Dir["#{__dir__}/../fixtures/*.html.erb"].shuffle.each do |erb_path|
       expected_path = erb_path.chomp(".erb") + ".expected.erb"

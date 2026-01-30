@@ -132,13 +132,14 @@ class ERB::Formatter
     return "" if attrs.strip.empty?
 
     plain_attrs = attrs.tr("\n", " ").squeeze(" ").gsub(erb_tags_regexp, erb_tags)
+    current_indent = tag_stack.size * 2
 
     if @css_class_sorter
       sorted_attrs = build_single_line_attrs(attrs)
-      within_line_width = "<#{tag_name} #{sorted_attrs}#{tag_closing}".size <= line_width
+      within_line_width = current_indent + "<#{tag_name} #{sorted_attrs}#{tag_closing}".size <= line_width
       return " #{sorted_attrs}" if within_line_width
     else
-      within_line_width = "<#{tag_name} #{plain_attrs}#{tag_closing}".size <= line_width
+      within_line_width = current_indent + "<#{tag_name} #{plain_attrs}#{tag_closing}".size <= line_width
       return " #{plain_attrs}" if within_line_width
     end
 
